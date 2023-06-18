@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 struct Block {
   int value; // value na node (0, 1, 2, 3, 4, 5)
   struct Block *next;
@@ -132,8 +133,68 @@ void dfs_search(struct Platform *currentPlatform,
   routeIndex--;
   currentPlatform->is_visited = false;
 }
+bool check_pesho_escape(struct Map *map, int **stored_links, int routeCount) {
+  for (int i = 0; i < routeCount; ++i) {
+    int *route = stored_links[i];
+    bool pesho_caught = false;
 
-void real_life(struct Map *map) {
+    // Reset positions of Pesho and Polizei
+    position_characters(map);
+
+    for (int j = 0; j < map->platform_count; ++j) {
+      int num_blocks = route[j];
+
+      for (int k = 0; k < num_blocks; ++k) {
+        turn_pesho(map);
+
+        // proveri pesho's position
+        if (pesho.position == polizei.position) {
+          pesho_caught = true;
+          break;
+        }
+      }
+
+      if (pesho_caught) {
+        break;
+      }
+
+      // Calculate the maximum distance Polizei moje da stigne
+      int max_polizei_distance = polizei.jump * (num_blocks + 1);
+
+      // Calculate the minimum distance Pesho needs to stay away from Polizei
+      int min_pesho_distance = pesho.jump;
+
+      for (int k = 0; k < max_polizei_distance; ++k) {
+        turn_polizei(map);
+
+        // Check if Pesho's position matches Polizei's position
+        if (pesho.position == polizei.position) {
+          pesho_caught = true;
+          break;
+        }
+
+        // Check if Polizei has moved closer to Pesho than the minimum distance
+        if (k >= min_pesho_distance && pesho.position->next != NULL && polizei.position->next != NULL &&
+            pesho.position->next == polizei.position->next) {
+          pesho_caught = true;
+          break;
+        }
+      }
+
+      if (pesho_caught) {
+        break;
+      }
+    }
+
+    if (!pesho_caught) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool real_life(struct Map *map) {
   struct Platform *safe_platform = find_safe_platform_util(map);
 
   if (safe_platform == NULL) {
@@ -152,12 +213,22 @@ void real_life(struct Map *map) {
 
   free(link_route);
 
+  // Check if Pesho can safely navigatne prez vsichki platformi
+  bool pesho_can_escape = check_pesho_escape(map, stored_links, routeCount);
+
+  if (pesho_can_escape) {
+    printf("Pesho can safely navigate through all platforms and escape the Polizei.\n");
+    return true;
+  } else {
+    printf("Pesho cannot escape the Polizei.\n");
+    return false;
+  }
+
   for (int i = 0; i < routeCount; ++i) {
     free(stored_links[i]);
   }
   free(stored_links);
 }
-
 
 int main(void) {
   printf("Hello World\n");
