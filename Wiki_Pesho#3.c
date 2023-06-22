@@ -44,11 +44,13 @@ struct Platform *find_safe_platform(struct Map *map) {
 
   for (int i = 0; i < map->head_platform->num_links; ++i) {
     struct Platform *temp = map->head_platform->link_array[i]->platform_node;
+    // proverka dali platformata e available
     if (map->head_platform->link_array[i]->distance < polizei.jump &&
         map->head_platform->link_array[i]->distance > pesho.jump) {
       break;
     }
 
+    // if unvisited
     if (!temp->is_visited) {
       struct Platform *result = find_safe_platform(map);
       if (result != NULL) {
@@ -82,119 +84,85 @@ void position_characters(struct Map *map) {
   pesho.position = temp;
 }
 
-void turn_pesho(struct Map *map) {
-  if (pesho.position->next == NULL) {
-    map->head_platform = map->head_platform;
-  }
-  pesho.position = pesho.position->next;
-  // position edno napred ili mesti platformata
-  //  tursi nai malko malki platformi
-}
+struct Platform** check_available_route(struct Platform *starting_platform,
+                             struct Platform *safe_platform) {
+  int routeCount = 0;
+  struct Platform **stored_links = realloc(stored_links, (routeCount + 1) * sizeof(struct Platform *));
 
-void turn_polizei(struct Map *map) {}
+  struct Platform *queue[100];
+  int front = 0;
+  int rear = 0;
 
+  starting_platform->is_visited = true;
+  queue[rear++] = starting_platform;
 
-void dfs_search(struct Platform *currentPlatform,
-                struct Platform *starting_platform, int *link_route,
-                int routeIndex, int ***stored_links, int *routeCount) {
-  currentPlatform->is_visited = true;
-  link_route[routeIndex] = currentPlatform->num_blocks;
-  routeIndex++;
+  while (front < rear) {
+    struct Platform *current_platform = queue[front++];
 
-  if (currentPlatform == starting_platform) {
-    bool allLinksUnderThreshold = true;
-    for (int i = 0; i < routeIndex - 1; ++i) {
-      if (currentPlatform->link_array[i]->distance >= pesho.jump) {
-        allLinksUnderThreshold = false;
-        break;
-      }
-    }
-
-    if (allLinksUnderThreshold) {
-      *stored_links = realloc(*stored_links, (*routeCount + 1) * sizeof(int *));
-      (*stored_links)[*routeCount] = calloc(routeIndex, sizeof(int));
-
-      for (int i = 0; i < routeIndex; ++i) {
-        (*stored_links)[*routeCount][i] = link_route[i];
+    if (current_platform == safe_platform) {
+      int block_sum = 0;
+      int routeIndex = front - 1;
+      while (routeIndex >= 0) {
+        struct Platform *platform = queue[routeIndex];
+        if (platform->num_blocks > 2 && platform->num_blocks % 2 == 0) {
+          platform->num_blocks += 1;
+        }
+        block_sum += platform->num_blocks;
+        routeIndex--;
       }
 
-      (*routeCount)++;
-    }
-  } else {
-    for (int i = 0; i < currentPlatform->num_links; ++i) {
-      struct Platform *nextPlatform = currentPlatform->link_array[i]->platform_node;
-      if (!nextPlatform->is_visited) {
-        dfs_search(nextPlatform, starting_platform, link_route,
-                   routeIndex, stored_links, routeCount);
+      int numberOfLinks = front - 1;
+      int numberOfPlatforms = front;
+
+      // calculate the sum of all links and platform block counts in the route
+      int polizei_sum = numberOfLinks + numberOfPlatforms * (block_sum - 1);
+      int pesho_sum = numberOfLinks + numberOfPlatforms * (block_sum - 1) - starting_platform->num_blocks;
+
+      if (polizei_sum > pesho_sum) {
+        printf("Pesho is caught!!\n");
+      } else {
+        printf("Pesho managed to evade jail!\n");
+        stored_links = realloc(stored_links, (routeCount + 1) * sizeof(struct Platform *));
+        stored_links[routeCount] = malloc(front * sizeof(struct Platform *));
+        for (int i = 0; i < front; i++) {
+          stored_links[routeCount][i] = *queue[i];
+        }
+        routeCount++;
       }
-    }
-  }
+    } else {
+      struct Platform *neighbor_platforms[100];
+      int neighbor_count = 0;
 
-  routeIndex--;
-  currentPlatform->is_visited = false;
-}
-bool check_pesho_escape(struct Map *map, int **stored_links, int routeCount) {
-  for (int i = 0; i < routeCount; ++i) {
-    int *route = stored_links[i];
-    bool pesho_caught = false;
-
-    // Reset positions of Pesho and Polizei
-    position_characters(map);
-
-    for (int j = 0; j < map->platform_count; ++j) {
-      int num_blocks = route[j];
-
-      for (int k = 0; k < num_blocks; ++k) {
-        turn_pesho(map);
-
-        // proveri pesho's position
-        if (pesho.position == polizei.position) {
-          pesho_caught = true;
-          break;
+      // store available neighbor platforms
+      for (int i = 0; i < current_platform->num_links; ++i) {
+        struct Platform *next_platform = current_platform->link_array[i]->platform_node;
+        if (!next_platform->is_visited && current_platform->link_array[i]->distance < pesho.jump) {
+          neighbor_platforms[neighbor_count++] = next_platform;
+          next_platform->is_visited = true;
         }
       }
 
-      if (pesho_caught) {
-        break;
-      }
+      if (neighbor_count > 0) {
+        // find the neighbor platform with the lowest block count and is unvisited
+        struct Platform *next_platform = neighbor_platforms[0];
+        int lowest_block_count = next_platform->num_blocks;
 
-      // Calculate the maximum distance Polizei moje da stigne
-      int max_polizei_distance = polizei.jump * (num_blocks + 1);
-
-      // Calculate the minimum distance Pesho needs to stay away from Polizei
-      int min_pesho_distance = pesho.jump;
-
-      for (int k = 0; k < max_polizei_distance; ++k) {
-        turn_polizei(map);
-
-        // Check if Pesho's position matches Polizei's position
-        if (pesho.position == polizei.position) {
-          pesho_caught = true;
-          break;
+        for (int i = 1; i < neighbor_count; ++i) {
+          if (neighbor_platforms[i]->num_blocks < lowest_block_count) {
+            next_platform = neighbor_platforms[i];
+            lowest_block_count = next_platform->num_blocks;
+          }
         }
 
-        // Check if Polizei has moved closer to Pesho than the minimum distance
-        if (k >= min_pesho_distance && pesho.position->next != NULL && polizei.position->next != NULL &&
-            pesho.position->next == polizei.position->next) {
-          pesho_caught = true;
-          break;
-        }
+        queue[rear++] = next_platform;
       }
-
-      if (pesho_caught) {
-        break;
-      }
-    }
-
-    if (!pesho_caught) {
-      return true;
     }
   }
 
-  return false;
+  return stored_links;
 }
 
-bool real_life(struct Map *map) {
+void real_life(struct Map *map) {
   struct Platform *safe_platform = find_safe_platform_util(map);
 
   if (safe_platform == NULL) {
@@ -202,35 +170,9 @@ bool real_life(struct Map *map) {
   }
 
   struct Platform *starting_platform = map->head_platform;
-
-  int **stored_links = NULL;
-  int routeCount = 0;
-
-  int *link_route = calloc(map->platform_count, sizeof(int));
-
-  dfs_search(safe_platform, starting_platform, link_route, 0,
-             &stored_links, &routeCount);
-
-  free(link_route);
-
-  // Check if Pesho can safely navigatne prez vsichki platformi
-  bool pesho_can_escape = check_pesho_escape(map, stored_links, routeCount);
-
-  if (pesho_can_escape) {
-    printf("Pesho can safely navigate through all platforms and escape the Polizei.\n");
-    return true;
-  } else {
-    printf("Pesho cannot escape the Polizei.\n");
-    return false;
-  }
-
-  for (int i = 0; i < routeCount; ++i) {
-    free(stored_links[i]);
-  }
-  free(stored_links);
+  check_available_route(starting_platform, safe_platform);
 }
 
 int main(void) {
-  printf("Hello World\n");
   return 0;
 }
