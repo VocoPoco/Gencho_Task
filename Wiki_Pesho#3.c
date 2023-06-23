@@ -87,7 +87,7 @@ void position_characters(struct Map *map) {
 struct Platform** check_available_route(struct Platform *starting_platform,
                              struct Platform *safe_platform) {
   int routeCount = 0;
-  struct Platform **stored_links = realloc(stored_links, (routeCount + 1) * sizeof(struct Platform *));
+  struct Platform **stored_links = calloc(1, sizeof(struct Platform *));
 
   struct Platform *queue[100];
   int front = 0;
@@ -95,7 +95,7 @@ struct Platform** check_available_route(struct Platform *starting_platform,
 
   starting_platform->is_visited = true;
   queue[rear++] = starting_platform;
-
+	
   while (front < rear) {
     struct Platform *current_platform = queue[front++];
 
@@ -118,12 +118,11 @@ struct Platform** check_available_route(struct Platform *starting_platform,
       int polizei_sum = numberOfLinks + numberOfPlatforms * (block_sum - 1);
       int pesho_sum = numberOfLinks + numberOfPlatforms * (block_sum - 1) - starting_platform->num_blocks;
 
-      if (polizei_sum > pesho_sum) {
-        printf("Pesho is caught!!\n");
-      } else {
-        printf("Pesho managed to evade jail!\n");
-        stored_links = realloc(stored_links, (routeCount + 1) * sizeof(struct Platform *));
-        stored_links[routeCount] = malloc(front * sizeof(struct Platform *));
+    if (polizei_sum > pesho_sum) {
+      printf("Pesho is caught!!\n");
+    } else {
+      printf("Pesho managed to evade jail!\n");
+      struct Platform **temp_links = calloc(1 , (routeCount + 1) * sizeof(struct Platform *));
         for (int i = 0; i < front; i++) {
           stored_links[routeCount][i] = *queue[i];
         }
@@ -173,6 +172,34 @@ void real_life(struct Map *map) {
   check_available_route(starting_platform, safe_platform);
 }
 
-int main(void) {
-  return 0;
-}
+// int main(void) {
+//   struct Map map;
+//   map.platform_count = 2;
+//   map.platform_array = calloc(1, map.platform_count * sizeof(struct Platform *));
+
+//   struct Platform *platform1 = calloc(1, sizeof(struct Platform));
+//   map.head_platform = platform1;
+//   platform1->num_links = 1;
+//   platform1->link_array = calloc(1, platform1->num_links * sizeof(struct Links *));
+//   platform1->is_visited = false;
+
+//   struct Platform *platform2 = calloc(1, sizeof(struct Platform));
+//   map.platform_array[1] = platform2;
+//   platform2->num_links = 0;
+//   platform2->is_visited = false;
+
+//   struct Links *link12 = calloc(1, sizeof(struct Links));
+//   link12->platform_node = platform2;
+//   link12->distance = 5;
+//   link12->index = 0;
+//   platform1->link_array[0] = link12;
+
+//   pesho.jump = 1;
+//   polizei.jump = 3;
+
+//   real_life(&map);
+
+//   return 0;
+// }
+//
+// expected output: "Pesho managed to evade jail!"
